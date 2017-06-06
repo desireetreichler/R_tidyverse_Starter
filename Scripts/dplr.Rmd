@@ -1,0 +1,173 @@
+---
+title: "Tidyverse carpentry - day 1, afternoon"
+author: "Desiree Treichler"
+date: "6 juni 2017"
+output: html_document
+---
+  
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+Preparations: load data
+
+```{r, message = FALSE, warning = FALSE, error = FALSE}
+library(tidyverse)
+gapminder <- read_csv("../Data/gapminder-FiveYearData.csv")
+```
+
+
+# The pipe: %>%  
+We could write
+```{r, message = FALSE, warning = FALSE, error = FALSE}
+rep("This is an example", times=3)
+```
+or, do the same with a pipe:
+```{r, message = FALSE, warning = FALSE, error = FALSE}
+"This is an example" %>% rep(times=3)
+```
+
+##Make a new dataframe and show the head
+```{r, message = FALSE, warning = FALSE, error = FALSE}
+year_country_gdp <- select(gapminder,year,country,gdpPercap)
+knitr::kable(head(year_country_gdp)) # kable from the knitr package formats it nicely in markdown
+```
+
+
+-- or, do the same with a pipe:
+```{r, message = FALSE, warning = FALSE, error = FALSE}
+year_country_gdp <- gapminder %>%
+  select(year,country, gdpPercap)
+knitr::kable(head(year_country_gdp))
+```
+
+
+We can also do a filter and plot directly.
+
+```{r, message = FALSE, warning = FALSE, error = FALSE}
+gapminder %>% filter(year==2002) %>% 
+  ggplot(mapping=aes(x=continent, y=pop)) +
+  geom_boxplot()
+```
+
+Or filter and select in the same command. 
+```{r, message = FALSE, warning = FALSE, error = FALSE}
+year_country_gdp_euro <- gapminder %>% 
+  filter(continent=="Europe") %>% 
+  select(year,country,gdpPercap)
+knitr::kable(head(year_country_gdp_euro))
+```
+
+**Challenge 1: A single command that produces a data frame that has the Norwegian values for gdpPercap, liofeExp and year. How many rows does your data frame have and why?**
+
+```{r, message = FALSE, warning = FALSE, error = FALSE}
+Norway <- gapminder %>%
+  filter(country=="Norway") %>%
+  select(gdpPercap, lifeExp, year)
+Norway
+```
+Answer: the dataset has twelve rows. 
+
+
+## Grouping  
+Take the gapminder dataset, group it by continent, and summarize per group.
+```{r, message = FALSE, warning = FALSE, error = FALSE}
+gapminder %>% 
+  group_by(continent) %>%
+  summarize(mean_gdpPercap=mean(gdpPercap))
+```
+
+Add some plotting to the pipe.
+```{r, message = FALSE, warning = FALSE, error = FALSE}
+gapminder %>% 
+  group_by(continent) %>%
+  summarize(mean_gdpPercap=mean(gdpPercap)) %>%
+  ggplot(mapping = aes(x=continent, y = mean_gdpPercap))+
+  geom_point()
+```
+
+**Challenge 2: Calculate the average life expectancy per country in Asia. Which one has the longest onem which one the shortest?**
+
+```{r, message = FALSE, warning = FALSE, error = FALSE}
+gapminder %>%
+  filter(continent=="Asia") %>%
+  group_by(country) %>%
+  summarize(mean_lifeExp = mean(lifeExp)) %>%
+  filter(mean_lifeExp==min(mean_lifeExp)|mean_lifeExp==max(mean_lifeExp))
+```
+The last filter acts as a selector, and choses only the min/max value. 
+
+Alternatively, use arrange to order the list:
+```{r, message = FALSE, warning = FALSE, error = FALSE}
+gapminder %>%
+  filter(continent=="Asia") %>%
+  group_by(country) %>%
+  summarize(mean_lifeExp = mean(lifeExp)) %>%
+  arrange(mean_lifeExp)
+```
+
+Or, we could solve this graphically:
+```{r, message = FALSE, warning = FALSE, error = FALSE}
+gapminder %>%
+  filter(continent=="Asia") %>%
+  group_by(country) %>%
+  summarize(mean_lifeExp = mean(lifeExp)) %>%
+  ggplot(mapping = aes(x=reorder(country,mean_lifeExp), y = mean_lifeExp))+ geom_point() + 
+  coord_flip()
+```
+  
+To sort the y axis, specify the sorting variable directly in the aes() function.
+
+
+## Mutate
+Mutate adds new variables and preserves existing; transmute drops existing variables.
+Do some mutating and pipe the result directly to the head function:
+```{r, message = FALSE, warning = FALSE, error = FALSE}
+gapminder %>%
+  mutate(gdp_billion=gdpPercap*pop/10^9) %>%
+  knitr::kable(head())
+```
+This shows the GDP in billions for every country and every year.
+
+We can also summarize this further, and group by continent/year.
+
+```{r, message = FALSE, warning = FALSE, error = FALSE}
+gapminder %>%
+  mutate(gdp_billion=gdpPercap*pop/10^9) %>%
+group_by(continent,year) %>%
+  summarize(mean_gdp_billion=mean(gdp_billion))
+```
+
+We can create a summary dataset for each country to use later.
+```{r, message = FALSE, warning = FALSE, error = FALSE}
+gapminder_country_summary <- 
+  gapminder %>%
+  group_by(country) %>%
+  summarize(mean_lifeExp = mean(na.omit(lifeExp))) %>% #na.omit would remove NaNs, if there are any
+  arrange(mean_lifeExp)
+```
+
+
+## Maps
+Now, let's add some maps! First, load the package. 
+```{r, message = FALSE, warning = FALSE, error = FALSE}
+library(maps)
+```
+
+Then, get some coordinates for the entire world. 
+```{r, message = FALSE, warning = FALSE, error = FALSE}
+map_data("world") %>%
+  knitr::kable(head())
+```
+
+## rename and left join
+Unfortunately, in this dataset, the countries are called "region".  Rename this, join it with the country summary gapminder dataset, and send it directly to the plot. 
+```{r, message = FALSE, warning = FALSE, error = FALSE}
+map_data("world") %>%
+  rename(country=region) %>%
+  left_join(gapminder_country_summary, by="country") %>%
+  ggplot() + geom_polygon(aes(x=long, y=lat, group=group, fill=mean_lifeExp)) +
+  scale_fill_gradient(low="blue", high="red") # what colours to use
+```
+The holes are where the gapminder country named don't match the names of the map_data region names. 

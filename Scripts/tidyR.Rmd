@@ -1,0 +1,62 @@
+---
+title: "tidyr.R"
+author: "Desiree Treichler"
+date: "6 juni 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+Download some new data - first, try automatically.
+
+```{r, message = FALSE, warning = FALSE, error = FALSE}
+download.file(url = "http://docs.google.com/spreadsheet/pub?key=phAwcNAVuyj0NpF2PTov2Cw&output=xlsx", 
+              destfile = "../Data/indicator gapminder infant_mortality.xlsx")
+
+download.file(url = "http://docs.google.com/spreadsheet/pub?key=phAwcNAVuyj0NpF2PTov2Cw&output=xlsx", 
+              destfile = "../Data/indicator undata total_fertility.xlsx")
+```
+
+To read them, we need the readxl library. 
+```{r, message = TRUE, warning = TRUE, error = TRUE}
+library("readxl")
+library("tidyverse")
+raw_fert <- read_excel(path="../Data/indicator undata total_fertility.xlsx", sheet="Data")
+raw_infantMort <- read_excel(path="../Data/indicator gapminder infant_mortality.xlsx",sheet="Data")
+```
+
+Something is wrong with the files, so we download them manually as ...2.xlsx.
+Read in and preview!
+```{r, message = FALSE, warning = FALSE, error = FALSE}
+raw_fert <- read_excel(path="../Data/indicator undata total_fertility2.xlsx", sheet="Data")
+raw_infantMort <- read_excel(path="../Data/indicator gapminder infant_mortality2.xlsx",sheet="Data")
+```
+
+```{r}
+knitr::kable(head(raw_fert))
+```
+```{r, message = FALSE, warning = FALSE, error = FALSE}
+knitr::kable(head(raw_infantMort))
+```
+
+
+## Tidy up your data!
+Typically, we want one observation per row, and several attributes in the columns. We want to get from the long/wide formato to the tidy format that suits R best. 
+Long: everything stacked on top of each other.   
+Wide: as the input above -- a classical table, e.g. first column the ID, second to last column data for different years -> this we could tidy up: one column for the year, one column for the measurement.
+
+The gather function can do this:
+
+```{r, message = FALSE, warning = FALSE, error = FALSE}
+fert <- raw_fert %>%
+  rename(country=`Total fertility rate`) %>%  # so that it fits to our country names!
+  gather(key=year,value=fert,-country) %>% # gather everything but the first column
+  mutate(year=as.integer(year))
+knitr::kable(head(fert))
+```
+
+Note that the variable "Total fertility rate" needs single backticks - as seen in the preview!
+
